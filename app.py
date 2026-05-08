@@ -309,38 +309,9 @@ with col_badge:
 
 st.markdown("---")
 
-# ── Inputs ────────────────────────────────────────────────────────────────────
-st.markdown('<div class="section-title">Configure URL Features</div>', unsafe_allow_html=True)
-
-user_inputs = {}
-
-for group_name, group_features in GROUPS.items():
-    st.markdown(f"**{group_name}**")
-    cols = st.columns(3)
-    for i, feat in enumerate(group_features):
-        label, options_map = FEATURE_INFO.get(feat, (feat, {-1:'-1', 0:'0', 1:'+1'}))
-        available_vals = sorted(options_map.keys())
-        display_opts  = [options_map[v] for v in available_vals]
-        with cols[i % 3]:
-            chosen = st.selectbox(
-                label,
-                options=display_opts,
-                index=len(available_vals)-1,  # default to highest (safest)
-                key=feat
-            )
-            # Map back to numeric
-            user_inputs[feat] = available_vals[display_opts.index(chosen)]
-    st.markdown("")
-
-st.markdown("---")
-
-# ── Predict ───────────────────────────────────────────────────────────────────
-col1, col2, col3 = st.columns([1, 1, 1])
-with col2:
-    predict_btn = st.button("🔍  ANALYSE URL")
-
-if predict_btn:
-    input_vector = np.array([[user_inputs[f] for f in features]])
+# ── Prediction Display Function ───────────────────────────────────────────────
+def display_prediction(inputs_dict):
+    input_vector = np.array([[inputs_dict[f] for f in features]])
     input_scaled = scaler.transform(input_vector)
     prediction   = model.predict(input_scaled)[0]
     probability  = model.predict_proba(input_scaled)[0]
@@ -393,7 +364,7 @@ if predict_btn:
         cols = st.columns(3)
         for i, feat in enumerate(features):
             label = FEATURE_INFO.get(feat, (feat, {}))[0]
-            val   = user_inputs[feat]
+            val   = inputs_dict[feat]
             color = "#00c853" if val == 1 else ("#ff3d3d" if val == -1 else "#f9a825")
             cols[i % 3].markdown(
                 f'<div style="font-family:Space Mono,monospace;font-size:0.7rem;'
@@ -402,6 +373,60 @@ if predict_btn:
                 f'<span style="color:{color};font-weight:700">{val:+d}</span></div>',
                 unsafe_allow_html=True
             )
+
+# ── Inputs & Predict ──────────────────────────────────────────────────────────
+
+tab1, tab2 = st.tabs(["🔴 Live URL Analysis", "⚙️ Manual Feature Entry"])
+
+with tab1:
+    st.markdown('<div class="section-title">Analyze a Live URL</div>', unsafe_allow_html=True)
+    url_input = st.text_input("Enter URL (e.g., https://example.com):")
+    col_btn_1, col_btn_2, col_btn_3 = st.columns([1, 1, 1])
+    with col_btn_2:
+        live_analyze_btn = st.button("🚀 LIVE ANALYZE")
+
+    if live_analyze_btn and url_input:
+        if not url_input.startswith("http"):
+            url_input = "http://" + url_input
+        with st.spinner("Extracting 30 features from URL... This may take a few seconds."):
+            try:
+                from extractor import extract_features
+                extracted_features = extract_features(url_input)
+                display_prediction(extracted_features)
+            except Exception as e:
+                st.error(f"Error during feature extraction: {e}")
+
+with tab2:
+    st.markdown('<div class="section-title">Configure URL Features</div>', unsafe_allow_html=True)
+
+    user_inputs = {}
+
+    for group_name, group_features in GROUPS.items():
+        st.markdown(f"**{group_name}**")
+        cols = st.columns(3)
+        for i, feat in enumerate(group_features):
+            label, options_map = FEATURE_INFO.get(feat, (feat, {-1:'-1', 0:'0', 1:'+1'}))
+            available_vals = sorted(options_map.keys())
+            display_opts  = [options_map[v] for v in available_vals]
+            with cols[i % 3]:
+                chosen = st.selectbox(
+                    label,
+                    options=display_opts,
+                    index=len(available_vals)-1,  # default to highest (safest)
+                    key=feat
+                )
+                # Map back to numeric
+                user_inputs[feat] = available_vals[display_opts.index(chosen)]
+        st.markdown("")
+
+    st.markdown("---")
+
+    col1, col2, col3 = st.columns([1, 1, 1])
+    with col2:
+        predict_btn = st.button("🔍  ANALYSE MANUAL FEATURES")
+
+    if predict_btn:
+        display_prediction(user_inputs)
 
 # ── Footer info ───────────────────────────────────────────────────────────────
 st.markdown("---")
